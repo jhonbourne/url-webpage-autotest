@@ -1,4 +1,4 @@
-# database-interface-platform
+# Webpage automated test giving URL
 Automated test of webpage by giving URL and prompts of test cases.
 ## Workflow
 Input: an URL and text of prompts (describe test cases).
