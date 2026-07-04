@@ -1,4 +1,4 @@
-# Webpage automated test giving URL
+# Webpage automated test with URL
 Automated test of webpage by giving URL and prompts of test cases.
 ## Workflow
 Input: an URL and text of prompts (describe test cases).
@@ -10,10 +10,10 @@ Input: an URL and text of prompts (describe test cases).
 Developed in Windows.
 - python >= 3.12  
 - python dependencies:  
-    dotenv, pydantic
-    pytest-playwright (used in fetching HTML document of the webpage)
-    langgraph, langchain (LLM agent)
-    langchain_openai (As an example LLM API here)
+    dotenv, pydantic, flask  
+    pytest-playwright (used in fetching HTML document of the webpage)  
+    langgraph, langchain (LLM agent)  
+    langchain_openai (As an example LLM API here)  
 - API key is needed for using the LLM. Please set the environment variable by written for example OPENAI_API_KEY="sk-..." in an .env file.
 - In order to execute codes of automated testing, Selenium, Appium, or other automated testing framwork instructed in code generating should be setted in the environment. *(Maybe use Docker for replacement in the future.)*
 

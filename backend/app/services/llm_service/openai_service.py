@@ -22,9 +22,12 @@ class LLMService:
     async def analyze_with_self_check(
         self, 
         prompt: str,
-        analysis_type: str,
-        model: str = "gpt-4-turbo-preview"
+        model: str = None
     ) -> Dict[str, Any]:
+        
+        if model is None:
+            from .config import get_default_model, LLMProvider
+            model = get_default_model(LLMProvider.OPENAI)
         
         system_prompt = f"""
 """
