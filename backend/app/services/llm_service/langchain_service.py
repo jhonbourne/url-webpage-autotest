@@ -1,6 +1,7 @@
-import os
 import json
-from typing import Dict, Any, Optional
+import os
+from typing import Any
+
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
@@ -40,7 +41,7 @@ class LLMService:
             print(f"Error calling LLM: {e}")
             return ""
     
-    async def call_llm_json(self, prompt: str) -> Optional[Dict[str, Any]]:
+    async def call_llm_json(self, prompt: str) -> dict[str, Any] | None:
         """
         Make an LLM call expecting JSON response and parse it.
         

@@ -4,8 +4,9 @@ LLM Service Selector - Factory for selecting and initializing different LLM prov
 Allows agents to dynamically choose the best LLM model based on requirements.
 """
 
-from typing import Dict, Any, Optional, Literal
-from .config import LLMProvider, get_default_model, get_all_default_models, get_recommended_provider_for_task
+from typing import Any
+
+from .config import LLMProvider
 
 
 class LLMSelector:
@@ -26,7 +27,7 @@ class LLMSelector:
     @staticmethod
     def get_service(
         provider: LLMProvider | str,
-        base_url: Optional[str] = None
+        base_url: str | None = None
     ) -> Any:
         """
         Get LLM service instance for specified provider.
@@ -85,7 +86,7 @@ class LLMSelector:
         return LLMSelector.DEFAULT_MODELS.get(provider, "")
     
     @staticmethod
-    def list_providers() -> Dict[str, str]:
+    def list_providers() -> dict[str, str]:
         """
         List all available providers with their default models.
         

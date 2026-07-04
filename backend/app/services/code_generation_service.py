@@ -1,7 +1,8 @@
-from typing import Dict, Any, List, Optional
+from typing import Any
 
-from app.models.schemas import TestCase, GeneratedCode, CodeGenerationResult
 from llm_service.langchain_service import LLMService
+
+from app.models.schemas import CodeGenerationResult, GeneratedCode, TestCase
 
 
 class CodeGenerationService:
@@ -20,8 +21,8 @@ class CodeGenerationService:
     
     async def generate_test_code(
         self,
-        testable_cases: List[TestCase],
-        structured_dom: Dict[str, Any],
+        testable_cases: list[TestCase],
+        structured_dom: dict[str, Any],
         url: str
     ) -> CodeGenerationResult:
         """
@@ -83,7 +84,7 @@ class CodeGenerationService:
     async def _generate_code_for_case(
         self,
         test_case: TestCase,
-        structured_dom: Dict[str, Any],
+        structured_dom: dict[str, Any],
         url: str
     ) -> GeneratedCode:
         """
@@ -132,7 +133,7 @@ class CodeGenerationService:
     def _build_code_generation_prompt(
         self,
         test_case: TestCase,
-        structured_dom: Dict[str, Any],
+        structured_dom: dict[str, Any],
         url: str
     ) -> str:
         
@@ -196,7 +197,7 @@ Generate the code now:"""
         else:  # selenium (default)
             return "PRIORITIZE using Selenium WebDriver when possible. If the test case requires mobile testing, use Appium. Only use Playwright if explicitly required or if Selenium cannot handle the scenario."
     
-    def _describe_element(self, element: Dict[str, Any]) -> str:
+    def _describe_element(self, element: dict[str, Any]) -> str:
         """Create a readable description of a DOM element"""
         
         parts = []
@@ -228,7 +229,7 @@ Generate the code now:"""
         
         return " ".join(parts)
     
-    def _generate_summary(self, generated_codes: List[GeneratedCode]) -> str:
+    def _generate_summary(self, generated_codes: list[GeneratedCode]) -> str:
         
         if not generated_codes:
             return "No test code was generated."

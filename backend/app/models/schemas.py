@@ -1,72 +1,55 @@
-# app/models/schemas.py
-from typing import TypedDict, Optional, Dict, Any, List
-from enum import Enum
-from pydantic import BaseModel, Field
+"""API request/response models. Agent-internal state lives in app.agents.state."""
 
-class WorkflowStatus(str, Enum):
+from enum import StrEnum
+from typing import Any
+
+from pydantic import BaseModel, Field, HttpUrl
+
+
+class ScrapeStatus(StrEnum):
     PENDING = "pending"
     FETCHING = "fetching"
     PARSING = "parsing"
+    PLANNING = "planning"
+    EXTRACTING = "extracting"
     VALIDATING = "validating"
-    ANALYZING = "analyzing"
-    FORMATTING = "formatting"
     COMPLETED = "completed"
     FAILED = "failed"
 
-class TestCase(BaseModel):
-    """Model for individual test case"""
-    case_id: int = Field(description="Unique identifier for the test case")
-    description: str = Field(description="Natural language description of the test case")
-    can_test: bool = Field(description="Whether automated test code can be written for this case")
-    reason: str = Field(description="Explanation of why the test can or cannot be automated")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorizing the test case (e.g., 'element_click', 'form_input', 'navigation')")
 
-class TestCaseAnalysisResult(BaseModel):
-    """Model for test case analysis output"""
-    total_cases: int = Field(description="Total number of test cases extracted")
-    testable_cases: int = Field(description="Number of test cases that can be automated")
-    test_cases: List[TestCase] = Field(description="List of analyzed test cases with testability information")
-    analysis_summary: str = Field(description="Summary of the analysis")
+class ScrapeOptions(BaseModel):
+    wait_for_selector: str | None = Field(
+        default=None, description="CSS selector to await before reading the page"
+    )
+    timeout_ms: int | None = Field(default=None, ge=1000, le=120000)
+    force_browser: bool = Field(
+        default=False,
+        description="Skip the static-fetch fast path and always render with a browser",
+    )
 
-class GeneratedCode(BaseModel):
-    """Model for generated test code for a single test case"""
-    case_id: int = Field(description="ID of the test case this code was generated for")
-    case_description: str = Field(description="Description of the test case")
-    framework: str = Field(description="Testing framework used (e.g., 'selenium', 'appium', 'playwright')")
-    code: str = Field(description="Generated test code")
-    imports: List[str] = Field(default_factory=list, description="Required imports for this code")
-    setup_needed: bool = Field(default=False, description="Whether setup/teardown methods are needed")
-    dependencies: List[str] = Field(default_factory=list, description="External dependencies required")
 
-class CodeGenerationResult(BaseModel):
-    """Model for code generation output"""
-    total_generated: int = Field(description="Total number of test codes generated")
-    generated_codes: List[GeneratedCode] = Field(description="List of generated test codes")
-    generation_summary: str = Field(description="Summary of the code generation")
-    primary_framework: str = Field(description="Primary testing framework used")
-    all_imports: List[str] = Field(default_factory=list, description="All unique imports across all generated codes")
+class ScrapeRequest(BaseModel):
+    url: HttpUrl
+    # What to extract, in natural language. Optional until the planning node
+    # lands (P1); without it the pipeline stops after DOM structuring.
+    prompt: str | None = Field(default=None, max_length=4000)
+    options: ScrapeOptions = Field(default_factory=ScrapeOptions)
 
-class AnalysisState(TypedDict):
-    # Input parameters
+
+class ExecutionLogEntry(BaseModel):
+    timestamp: str
+    step: str
+    message: str
+    detail: dict[str, Any] = Field(default_factory=dict)
+
+
+class ScrapeResponse(BaseModel):
+    status: ScrapeStatus
     url: str
-    analysis_type: str
-    custom_prompt: Optional[str]
-    options: Dict[str, Any]
-    
-    # outputs in the process
-    raw_html: Optional[str]
-    structured_dom: Optional[Dict[str, Any]]
-    test_cases: Optional[TestCaseAnalysisResult]
-    generated_code: Optional[Any]  # CodeGenerationResult
-    
-    # state control
-    status: WorkflowStatus
-    current_step: str
-    error_message: Optional[str]
-    error_code: Optional[str]
-    
-    # metadata
-    execution_log: List[Dict[str, Any]]
-    start_time: Optional[str]
-    end_time: Optional[str]
-    analysis_result: Optional[Dict[str, Any]]
+    fetch_method: str | None = None
+    # P0: DOM structure summary; P1 replaces this with extracted records
+    data: dict[str, Any] | None = None
+    error: dict[str, str] | None = None
+    execution_log: list[ExecutionLogEntry] = Field(default_factory=list)
+    started_at: str | None = None
+    finished_at: str | None = None

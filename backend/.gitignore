@@ -1,3 +1,10 @@
+# legacy autotest workflow docs, superseded by /docs at repo root
 docs/
 __pycache__/
 *.py[cod]
+.venv/
+.env
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

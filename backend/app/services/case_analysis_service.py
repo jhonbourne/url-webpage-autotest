@@ -1,9 +1,9 @@
 """Case analysis service for test case extraction and testability analysis"""
-import json
-from typing import Dict, Any, List
+from typing import Any
+
+from llm_service.langchain_service import LLMService
 
 from app.models.schemas import TestCase, TestCaseAnalysisResult
-from llm_service.langchain_service import LLMService
 
 
 class CaseAnalysisService:
@@ -15,7 +15,7 @@ class CaseAnalysisService:
     async def extract_and_analyze_test_cases(
         self,
         case_prompt: str,
-        structured_dom: Dict[str, Any],
+        structured_dom: dict[str, Any],
         url: str
     ) -> TestCaseAnalysisResult:
         """
@@ -142,7 +142,7 @@ Do not include any other text or markdown formatting."""
         extracted_cases: list,
         structured_dom: Any, # Dict[str, Any](extracted) or str(HTML)
         url: str
-    ) -> List[TestCase]:
+    ) -> list[TestCase]:
         """Analyze testability of each extracted case"""
         
         analyzed_cases = []

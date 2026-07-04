@@ -1,20 +1,21 @@
 # app/services/llm_service/ollama_service.py
-import httpx
 import json
-from typing import Dict, Any, Optional
+from typing import Any
+
+import httpx
 from pydantic import BaseModel, Field
 
 
 class AnalysisResult(BaseModel):
     is_valid: bool = Field(description="Whether the input content is relevant to the analysis requirements")
     confidence: float = Field(description="Judge the confidence level, between 0 and 1")
-    reason: Optional[str] = Field(description="If is_valid=false, explain the reason")
+    reason: str | None = Field(description="If is_valid=false, explain the reason")
     analysis_type_matched: bool = Field(description="Whether analysis_type matches the content")
     
     # output for valid analysis
-    result: Optional[Dict[str, Any]] = Field(default=None, description="Analysis result")
-    key_findings: Optional[list] = Field(default=None)
-    recommendations: Optional[list] = Field(default=None)
+    result: dict[str, Any] | None = Field(default=None, description="Analysis result")
+    key_findings: list | None = Field(default=None)
+    recommendations: list | None = Field(default=None)
 
 
 class LLMService:
@@ -32,7 +33,7 @@ class LLMService:
         self, 
         prompt: str,
         model: str = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Analyze content using Ollama with self-validation.
         
@@ -46,13 +47,13 @@ class LLMService:
         """
 
         if model is None:
-            from .config import get_default_model, LLMProvider
+            from .config import LLMProvider, get_default_model
             model = get_default_model(LLMProvider.OLLAMA)
         
-        system_prompt = f"""
+        system_prompt = """
 You are an expert AI assistant performing analysis.
 Analyze the provided content carefully and return a JSON response with the following structure:
-{{
+{
     "is_valid": boolean,
     "confidence": float (0-1),
     "reason": string (only if is_valid=false),
@@ -60,7 +61,7 @@ Analyze the provided content carefully and return a JSON response with the follo
     "result": object (analysis results),
     "key_findings": list,
     "recommendations": list
-}}
+}
 
 Always validate your own output to ensure it matches the required format.
 """
@@ -148,7 +149,7 @@ Always validate your own output to ensure it matches the required format.
         self, 
         prompt: str, 
         model: str = "llama2"
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Make an LLM call expecting JSON response and parse it.
         

@@ -4,7 +4,6 @@ Centralized configuration for LLM services.
 All default model strings are controlled from this single file.
 """
 
-from typing import Dict
 from enum import Enum
 
 
@@ -44,7 +43,7 @@ def get_default_model(provider: LLMProvider | str) -> str:
     return DEFAULT_MODELS.get(provider, "")
 
 
-def get_all_default_models() -> Dict[str, str]:
+def get_all_default_models() -> dict[str, str]:
     """
     Get all default models as a dictionary.
 
