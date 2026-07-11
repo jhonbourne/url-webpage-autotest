@@ -10,7 +10,8 @@ dependencies = [
     "pydantic-settings>=2.3",
     "langgraph>=0.2",
     "langchain-core>=0.3",
-    "langchain-anthropic>=0.2",
+    "langchain-openai>=0.2",  # DashScope via OpenAI-compatible endpoint (default provider)
+    "langchain-anthropic>=0.2",  # alternative provider
     "playwright>=1.45",
     "beautifulsoup4>=4.12",
     "lxml>=5.2",
@@ -18,9 +19,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Extra LLM providers, wired in when app.services.llm.build_chat_model grows past Claude
+# Extra LLM providers, wired in when app.services.llm.build_chat_model grows past these
 providers = [
-    "langchain-openai",
     "langchain-google-genai",
     "langchain-cohere",
     "langchain-ollama",

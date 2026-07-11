@@ -29,14 +29,16 @@ async def lifespan(app: FastAPI):
     fetch_service = FetchService(settings)
     app.state.fetch_service = fetch_service
 
-    llm = build_chat_model(settings)
+    # Role-based models: general reasoning vs. code-specialized (selector generation).
+    general_llm = build_chat_model(settings, role="general")
+    code_llm = build_chat_model(settings, role="code")
     app.state.agent = ScraperAgent(
         fetch_service=fetch_service,
         dom_service=DOMService(),
-        planner=ExtractionPlanner(llm),
-        selector_generator=SelectorGenerator(llm),
+        planner=ExtractionPlanner(general_llm),
+        selector_generator=SelectorGenerator(code_llm),
         selector_executor=SelectorExecutor(),
-        llm_extractor=LLMExtractor(llm),
+        llm_extractor=LLMExtractor(general_llm),
         validator=ResultValidator(min_field_coverage=settings.min_field_coverage),
         max_retries=settings.max_extraction_retries,
     )

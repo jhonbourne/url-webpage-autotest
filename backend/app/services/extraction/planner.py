@@ -28,7 +28,9 @@ class ExtractionPlanner:
         self._llm = llm
 
     async def plan(self, prompt: str, structured_dom: dict[str, Any]) -> ExtractionPlan:
-        model = self._llm.with_structured_output(ExtractionPlan)
+        # function_calling is supported by both Qwen (DashScope) and Anthropic;
+        # the newer json_schema mode is not reliably available on DashScope.
+        model = self._llm.with_structured_output(ExtractionPlan, method="function_calling")
         dom_json = json.dumps(structured_dom, ensure_ascii=False)
         user = (
             f"User request:\n{prompt}\n\n"

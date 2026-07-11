@@ -35,7 +35,7 @@ class SelectorGenerator:
         structured_dom: dict[str, Any],
         feedback: str | None = None,
     ) -> SelectorPlan:
-        model = self._llm.with_structured_output(SelectorPlan)
+        model = self._llm.with_structured_output(SelectorPlan, method="function_calling")
         fields_desc = "\n".join(f"- {f.name}: {f.description} ({f.type})" for f in plan.fields)
         dom_json = json.dumps(structured_dom, ensure_ascii=False)
         feedback_block = f"\nA previous attempt had problems: {feedback}\n" if feedback else ""

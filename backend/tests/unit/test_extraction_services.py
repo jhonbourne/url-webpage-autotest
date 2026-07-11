@@ -21,7 +21,7 @@ class FakeStructuredLLM:
     def __init__(self, result):
         self._result = result
 
-    def with_structured_output(self, _schema):
+    def with_structured_output(self, _schema, **_kwargs):
         return _FakeStructuredModel(self._result)
 
 

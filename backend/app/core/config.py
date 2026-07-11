@@ -23,12 +23,19 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
-    # LLM
-    llm_provider: str = "claude"
-    # Overrides the provider's built-in default model when set (see llm_service/config.py)
-    llm_model: str | None = "claude-sonnet-5"
-    # Read from .env and passed explicitly to the client (uvicorn does not export .env
-    # into the process environment, so the SDK cannot pick it up on its own).
+    # LLM: provider is "dashscope" (Aliyun, OpenAI-compatible) or "claude".
+    llm_provider: str = "dashscope"
+    # Role-based models. Swap these in .env for the logic-test (small) vs
+    # performance-eval (large) profiles; prefer qwen3-*, then higher versions.
+    llm_model: str = "qwen3-8b"  # general reasoning: planner, llm_extract
+    llm_code_model: str = "qwen3-coder-30b-a3b-instruct"  # code task: selector generation
+
+    # DashScope (read from .env; uvicorn does not export .env into the process env,
+    # so the key must be passed to the client explicitly).
+    dashscope_api_key: str | None = None
+    dashscope_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+    # Anthropic (only used when llm_provider == "claude").
     anthropic_api_key: str | None = None
 
     # Extraction quality / reflection loop
