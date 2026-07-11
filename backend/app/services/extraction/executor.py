@@ -38,19 +38,26 @@ class SelectorExecutor:
             record[name] = self._extract_field(scope, spec)
         return record
 
-    @staticmethod
-    def _extract_field(scope: Tag | BeautifulSoup, spec: FieldSelector) -> str | None:
+    @classmethod
+    def _extract_field(cls, scope: Tag | BeautifulSoup, spec: FieldSelector) -> Any:
         try:
+            if spec.multiple:
+                elements = scope.select(spec.selector) if spec.selector else [scope]
+                return [cls._value_of(el, spec.attr) for el in elements]
             element = scope.select_one(spec.selector) if spec.selector else scope
         except Exception:
             # An invalid selector yields a null value rather than crashing the run
-            return None
+            return [] if spec.multiple else None
         if element is None:
             return None
-        if spec.attr == "text":
+        return cls._value_of(element, spec.attr)
+
+    @staticmethod
+    def _value_of(element: Tag, attr: str) -> str | None:
+        if attr == "text":
             text = element.get_text(strip=True)
             return text or None
-        value = element.get(spec.attr)
+        value = element.get(attr)
         if isinstance(value, list):
             return " ".join(value)
         return value

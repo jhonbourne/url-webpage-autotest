@@ -41,6 +41,10 @@ def build_chat_model(
             "max_tokens": 4096,
             "timeout": 60,
             "temperature": 0,
+            # Qwen3 general models enable "thinking" by default, which DashScope
+            # rejects on non-streaming calls; our extraction calls are non-streaming
+            # and deterministic, so turn it off. (Coder models ignore this.)
+            "extra_body": {"enable_thinking": False},
         }
         params.update(overrides)
         return ChatOpenAI(**params)

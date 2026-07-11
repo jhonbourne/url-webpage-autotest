@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-FieldType = Literal["string", "number", "url", "boolean"]
+FieldType = Literal["string", "number", "url", "boolean", "array"]
 Strategy = Literal["selector", "llm"]
 
 
@@ -33,6 +33,8 @@ class FieldSelector(BaseModel):
     selector: str = Field(description="CSS selector, relative to the record container")
     # Where the value lives: element text, or a named attribute (e.g. href, src)
     attr: str = Field(default="text")
+    # True for list-valued fields (e.g. tags): match all elements, return a list
+    multiple: bool = Field(default=False)
 
 
 class SelectorPlan(BaseModel):

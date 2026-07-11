@@ -46,6 +46,27 @@ def test_invalid_selector_does_not_crash(products_html: str):
     assert all(r["bad"] is None for r in records)
 
 
+def test_multiple_field_returns_list(products_html: str):
+    # Treat the whole list as one record and collect all names into an array field.
+    plan = SelectorPlan(
+        record_selector="",
+        fields={"names": FieldSelector(selector="a.name", attr="text", multiple=True)},
+    )
+    records = SelectorExecutor().execute(products_html, plan, is_list=False)
+    assert records == [
+        {"names": ["Wireless Mouse", "Mechanical Keyboard", "USB-C Hub"]}
+    ]
+
+
+def test_multiple_field_empty_when_no_match(products_html: str):
+    plan = SelectorPlan(
+        record_selector="li.product",
+        fields={"tags": FieldSelector(selector="span.tag", attr="text", multiple=True)},
+    )
+    records = SelectorExecutor().execute(products_html, plan, is_list=True)
+    assert all(r["tags"] == [] for r in records)
+
+
 def test_single_record_mode(products_html: str):
     plan = SelectorPlan(
         record_selector="",

@@ -18,9 +18,11 @@ and a compressed JSON view of the page DOM, produce a JSON object:
 empty string for a single-record page>",
   "fields": {
     "<field_name>": {"selector": "<CSS selector relative to the record container>", \
-"attr": "text" | "<html attribute like href/src>"}
+"attr": "text" | "<html attribute like href/src>", "multiple": false}
   }
 }
+Set "multiple": true for list-valued fields (type "array", e.g. tags): the selector \
+should then match every item and the value becomes a list. \
 Use selectors that are as robust as possible (prefer stable class/tag structure). \
 Return ONLY the JSON object, no prose."""
 
