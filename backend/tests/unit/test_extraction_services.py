@@ -1,0 +1,70 @@
+"""Planner and LLM extractor with fake chat models (no network / no credits)."""
+
+import pytest
+
+from app.services.extraction.llm_extractor import LLMExtractor
+from app.services.extraction.models import ExtractionPlan, FieldSpec
+from app.services.extraction.planner import ExtractionPlanner
+
+
+class _FakeStructuredModel:
+    def __init__(self, result):
+        self._result = result
+
+    async def ainvoke(self, _messages):
+        return self._result
+
+
+class FakeStructuredLLM:
+    """Mimics a chat model whose .with_structured_output returns typed objects."""
+
+    def __init__(self, result):
+        self._result = result
+
+    def with_structured_output(self, _schema):
+        return _FakeStructuredModel(self._result)
+
+
+class _FakeMessage:
+    def __init__(self, content: str):
+        self.content = content
+
+
+class FakeContentLLM:
+    def __init__(self, content: str):
+        self._content = content
+
+    async def ainvoke(self, _messages):
+        return _FakeMessage(self._content)
+
+
+@pytest.mark.asyncio
+async def test_planner_returns_typed_plan():
+    plan = ExtractionPlan(
+        is_extractable=True,
+        is_list=True,
+        fields=[FieldSpec(name="title", description="the title")],
+        suggested_strategy="selector",
+    )
+    planner = ExtractionPlanner(FakeStructuredLLM(plan))
+    result = await planner.plan("get titles", {"tag": "body"})
+    assert result.is_extractable
+    assert result.fields[0].name == "title"
+
+
+@pytest.mark.asyncio
+async def test_llm_extractor_parses_records():
+    plan = ExtractionPlan(
+        is_extractable=True, fields=[FieldSpec(name="title", description="t")]
+    )
+    llm = FakeContentLLM('[{"title": "A"}, {"title": "B"}]')
+    records = await LLMExtractor(llm).extract(plan, {"tag": "body"})
+    assert records == [{"title": "A"}, {"title": "B"}]
+
+
+@pytest.mark.asyncio
+async def test_llm_extractor_wraps_single_object():
+    plan = ExtractionPlan(is_extractable=True, fields=[FieldSpec(name="title", description="t")])
+    llm = FakeContentLLM('{"title": "solo"}')
+    records = await LLMExtractor(llm).extract(plan, {"tag": "body"})
+    assert records == [{"title": "solo"}]

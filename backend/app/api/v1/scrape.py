@@ -24,9 +24,10 @@ async def scrape(request: Request, payload: ScrapeRequest) -> ScrapeResponse:
             "message": final_state.get("error_message") or "Unknown failure",
         }
 
-    data = None
-    if final_state.get("structured_dom") is not None:
-        # P0 payload: the compressed DOM tree. P1 replaces this with extracted records.
+    # P1 payload: extracted records + quality metrics. Falls back to the compressed
+    # DOM when no prompt was given (pipeline stops after structuring).
+    data = final_state.get("extraction_result")
+    if data is None and final_state.get("structured_dom") is not None:
         data = {"structured_dom": final_state["structured_dom"]}
 
     return ScrapeResponse(

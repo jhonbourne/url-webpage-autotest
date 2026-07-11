@@ -10,7 +10,14 @@ from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import request_id_var, setup_logging
 from app.services.dom_service import DOMService
+from app.services.extraction import (
+    ExtractionPlanner,
+    LLMExtractor,
+    SelectorExecutor,
+    SelectorGenerator,
+)
 from app.services.fetch_service import FetchService
+from app.services.llm import build_chat_model
 
 
 @asynccontextmanager
@@ -20,7 +27,16 @@ async def lifespan(app: FastAPI):
 
     fetch_service = FetchService(settings)
     app.state.fetch_service = fetch_service
-    app.state.agent = ScraperAgent(fetch_service=fetch_service, dom_service=DOMService())
+
+    llm = build_chat_model(settings)
+    app.state.agent = ScraperAgent(
+        fetch_service=fetch_service,
+        dom_service=DOMService(),
+        planner=ExtractionPlanner(llm),
+        selector_generator=SelectorGenerator(llm),
+        selector_executor=SelectorExecutor(),
+        llm_extractor=LLMExtractor(llm),
+    )
 
     yield
 

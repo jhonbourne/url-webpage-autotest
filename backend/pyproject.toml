@@ -10,7 +10,7 @@ dependencies = [
     "pydantic-settings>=2.3",
     "langgraph>=0.2",
     "langchain-core>=0.3",
-    "langchain-openai>=0.2",
+    "langchain-anthropic>=0.2",
     "playwright>=1.45",
     "beautifulsoup4>=4.12",
     "lxml>=5.2",
@@ -18,9 +18,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Extra LLM providers supported by app.services.llm_service
+# Extra LLM providers, wired in when app.services.llm.build_chat_model grows past Claude
 providers = [
-    "langchain-anthropic",
+    "langchain-openai",
     "langchain-google-genai",
     "langchain-cohere",
     "langchain-ollama",

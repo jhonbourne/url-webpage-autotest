@@ -14,7 +14,10 @@ class ScrapeState(TypedDict, total=False):
     raw_html: str | None
     fetch_method: str | None  # "static" | "browser"
     structured_dom: dict[str, Any] | None
-    # P1: extraction_plan, extraction_result, validation_report
+    extraction_plan: dict[str, Any] | None
+    selector_plan: dict[str, Any] | None  # only set on the "selector" strategy path
+    extraction_result: dict[str, Any] | None
+    # P2: validation_report, retry_count
 
     # --- control ---
     status: ScrapeStatus
