@@ -1,0 +1,31 @@
+.scraper-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  text-align: left;
+}
+
+.input-card {
+  margin-bottom: 20px;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.timeline-card :global(.ant-timeline) {
+  margin-top: 8px;
+}
+
+.result-main {
+  min-width: 0; /* let the table scroll instead of overflowing the grid */
+}
+
+@media (max-width: 820px) {
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+}

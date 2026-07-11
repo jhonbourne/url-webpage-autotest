@@ -1,10 +1,10 @@
 import './App.css';
-import { ChatPage } from './components/Chat/ChatPage';
+import ScraperPage from './components/Scraper/ScraperPage';
 
 function App() {
   return (
     <div className="App">
-      <ChatPage />
+      <ScraperPage />
     </div>
   );
 }
