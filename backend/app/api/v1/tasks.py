@@ -2,7 +2,13 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 
 from app.models.orm import ScrapeTask
-from app.models.schemas import TaskDetail, TaskListResponse, TaskSummary
+from app.models.schemas import (
+    ExecutionLogEntry,
+    ScrapeStatus,
+    TaskDetail,
+    TaskListResponse,
+    TaskSummary,
+)
 from app.repository import TaskRepository
 from app.services import export_service
 
@@ -14,7 +20,7 @@ def _summary(task: ScrapeTask) -> TaskSummary:
         id=task.id,
         url=task.url,
         prompt=task.prompt,
-        status=task.status,
+        status=ScrapeStatus(task.status),
         strategy=task.strategy,
         row_count=task.row_count,
         error_code=task.error_code,
@@ -48,7 +54,7 @@ async def get_task(request: Request, task_id: str) -> TaskDetail:
         **_summary(task).model_dump(),
         fetch_method=task.fetch_method,
         error_message=task.error_message,
-        execution_log=task.execution_log or [],
+        execution_log=[ExecutionLogEntry(**e) for e in (task.execution_log or [])],
         fields=result.fields if result else [],
         records=result.records if result else [],
         field_coverage=result.field_coverage if result else {},

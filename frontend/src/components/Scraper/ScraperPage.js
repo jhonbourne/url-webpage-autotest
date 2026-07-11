@@ -122,12 +122,11 @@ export default function ScraperPage() {
       </Paragraph>
 
       <Card size="small" className="input-card">
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        <Space orientation="vertical" style={{ width: '100%' }} size="middle">
           <Input
-            addonBefore="URL"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://..."
+            placeholder="URL — https://..."
           />
           <TextArea
             value={prompt}

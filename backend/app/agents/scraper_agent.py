@@ -134,8 +134,10 @@ class ScraperAgent:
     @staticmethod
     def _route_validation(state: ScrapeState) -> Literal["selector", "llm", "done"]:
         next_strategy = state.get("next_strategy")
-        if next_strategy in ("selector", "llm"):
-            return next_strategy
+        if next_strategy == "selector":
+            return "selector"
+        if next_strategy == "llm":
+            return "llm"
         return "done"
 
     @staticmethod

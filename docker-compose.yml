@@ -1,0 +1,20 @@
+# Backend API + Chromium in one container. The frontend runs via `npm start`
+# during development (its dev server proxies /api to this backend on :8000).
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Provide these via a .env file or your shell; nothing is baked into the image.
+      LLM_PROVIDER: ${LLM_PROVIDER:-dashscope}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-qwen3-8b}
+      LLM_CODE_MODEL: ${LLM_CODE_MODEL:-qwen3-coder-30b-a3b-instruct}
+      # Persist the SQLite file on a named volume so history survives restarts.
+      DATABASE_URL: sqlite+aiosqlite:////data/scraper.db
+    volumes:
+      - scraper-data:/data
+
+volumes:
+  scraper-data:

@@ -42,7 +42,8 @@ class LLMExtractor:
             response = await self._llm.ainvoke(
                 [{"role": "system", "content": _SYSTEM}, {"role": "user", "content": user}]
             )
-            data = parse_json_response(response.content)
+            content = response.content
+            data = parse_json_response(content if isinstance(content, str) else str(content))
         except Exception as e:
             raise ExtractionError(f"LLM extraction failed: {e}") from e
 

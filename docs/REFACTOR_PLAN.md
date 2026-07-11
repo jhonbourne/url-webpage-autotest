@@ -194,7 +194,8 @@ backend/
 │   │   │   ├── selector_gen.py # 选择器生成（由 code_generation_service 改造）
 │   │   │   ├── llm_extractor.py# LLM 直抽策略
 │   │   │   └── validator.py    # 结果质量校验
-│   │   └── llm_service/        # 原样保留
+│   │   ├── llm/                # 角色化 chat-model 工厂（取代旧 llm_service）
+│   │   └── sinks/              # 可插拔外部结果 sink
 │   ├── models/
 │   │   ├── schemas.py          # API 请求/响应模型
 │   │   └── orm.py              # SQLAlchemy：ScrapeTask / ScrapeResult

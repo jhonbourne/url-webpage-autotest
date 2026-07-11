@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from app.agents.scraper_agent import ScraperAgent
 from app.agents.state import ScrapeState
-from app.models.schemas import ScrapeRequest, ScrapeResponse, ScrapeStatus
+from app.models.schemas import ExecutionLogEntry, ScrapeRequest, ScrapeResponse, ScrapeStatus
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["scrape"])
@@ -37,7 +37,7 @@ def _build_response(final_state: ScrapeState, task_id: str | None = None) -> Scr
         data=data,
         error=error,
         validation=final_state.get("validation_report"),
-        execution_log=final_state.get("execution_log", []),
+        execution_log=[ExecutionLogEntry(**e) for e in final_state.get("execution_log", [])],
         started_at=final_state.get("started_at"),
         finished_at=final_state.get("finished_at"),
     )

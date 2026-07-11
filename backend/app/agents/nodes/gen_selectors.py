@@ -15,7 +15,7 @@ def make_gen_selectors_node(
 ) -> Callable[[ScrapeState], Awaitable[ScrapeState]]:
     async def gen_selectors(state: ScrapeState) -> ScrapeState:
         plan = ExtractionPlan.model_validate(state["extraction_plan"])
-        structured_dom = state["structured_dom"]
+        structured_dom = state["structured_dom"] or {}
 
         try:
             selector_plan = await generator.generate(

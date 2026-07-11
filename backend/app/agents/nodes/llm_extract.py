@@ -17,7 +17,7 @@ def make_llm_extract_node(
 ) -> Callable[[ScrapeState], Awaitable[ScrapeState]]:
     async def llm_extract(state: ScrapeState) -> ScrapeState:
         plan = ExtractionPlan.model_validate(state["extraction_plan"])
-        structured_dom = state["structured_dom"]
+        structured_dom = state["structured_dom"] or {}
 
         try:
             records = await extractor.extract(

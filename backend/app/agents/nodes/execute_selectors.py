@@ -17,7 +17,7 @@ def make_execute_selectors_node(
     def execute_selectors(state: ScrapeState) -> ScrapeState:
         plan = ExtractionPlan.model_validate(state["extraction_plan"])
         selector_plan = SelectorPlan.model_validate(state["selector_plan"])
-        html = state["raw_html"]
+        html = state["raw_html"] or ""
 
         records = executor.execute(html, selector_plan, plan.is_list)
         result = build_result(records, plan, strategy="selector")

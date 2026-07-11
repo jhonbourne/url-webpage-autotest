@@ -14,7 +14,7 @@ def make_validate_result_node(
     validator: ResultValidator, max_retries: int
 ) -> Callable[[ScrapeState], ScrapeState]:
     def validate_result(state: ScrapeState) -> ScrapeState:
-        result = state["extraction_result"]
+        result = state["extraction_result"] or {}
         report = validator.validate(result)
 
         if report.ok:
