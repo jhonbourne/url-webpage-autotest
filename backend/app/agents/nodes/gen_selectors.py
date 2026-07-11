@@ -18,7 +18,9 @@ def make_gen_selectors_node(
         structured_dom = state["structured_dom"]
 
         try:
-            selector_plan = await generator.generate(plan, structured_dom)
+            selector_plan = await generator.generate(
+                plan, structured_dom, feedback=state.get("last_failure_feedback")
+            )
         except ExtractionError as e:
             return error_update("gen_selectors", e.error_code, e.message)
 

@@ -24,6 +24,7 @@ def make_execute_selectors_node(
 
         return {
             "extraction_result": result,
+            "attempted_strategies": ["selector"],
             "status": ScrapeStatus.VALIDATING,
             "execution_log": [
                 log_entry(

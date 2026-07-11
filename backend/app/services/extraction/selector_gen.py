@@ -29,13 +29,20 @@ class SelectorGenerator:
     def __init__(self, llm: BaseChatModel):
         self._llm = llm
 
-    async def generate(self, plan: ExtractionPlan, structured_dom: dict[str, Any]) -> SelectorPlan:
+    async def generate(
+        self,
+        plan: ExtractionPlan,
+        structured_dom: dict[str, Any],
+        feedback: str | None = None,
+    ) -> SelectorPlan:
         model = self._llm.with_structured_output(SelectorPlan)
         fields_desc = "\n".join(f"- {f.name}: {f.description} ({f.type})" for f in plan.fields)
         dom_json = json.dumps(structured_dom, ensure_ascii=False)
+        feedback_block = f"\nA previous attempt had problems: {feedback}\n" if feedback else ""
         user = (
             f"is_list: {plan.is_list}\n"
-            f"Target fields:\n{fields_desc}\n\n"
+            f"Target fields:\n{fields_desc}\n"
+            f"{feedback_block}\n"
             f"Compressed DOM (truncated JSON):\n{dom_json[:12000]}"
         )
         try:

@@ -1,14 +1,19 @@
 """LangGraph workflow for agent-driven webpage content extraction.
 
-P1 graph:
+P2 graph:
     fetch_page -> structure_dom -> plan_extraction -> route_strategy
-      -> {gen_selectors -> execute_selectors | llm_extract} -> finalize
+      -> {gen_selectors -> execute_selectors | llm_extract}
+      -> validate_result -> route_validation
+           -> {gen_selectors | llm_extract  (reflection retry, other strategy)
+               | finalize}
     (plus error routing to handle_error)
 
-route_strategy is a deterministic read of the plan's suggested_strategy. P2 upgrades
-it to an LLM-driven decision edge and adds validate_result with a reflection retry loop.
+route_strategy picks the plan's suggested strategy; route_validation drives the
+reflection loop: a failed quality check retries with the other strategy, carrying
+the failure as feedback, up to max_extraction_retries.
 """
 
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -21,6 +26,7 @@ from app.agents.nodes import (
     make_llm_extract_node,
     make_plan_extraction_node,
     make_structure_dom_node,
+    make_validate_result_node,
 )
 from app.agents.state import ScrapeState
 from app.models.schemas import ScrapeStatus
@@ -28,6 +34,7 @@ from app.services.dom_service import DOMService
 from app.services.extraction import (
     ExtractionPlanner,
     LLMExtractor,
+    ResultValidator,
     SelectorExecutor,
     SelectorGenerator,
 )
@@ -43,6 +50,8 @@ class ScraperAgent:
         selector_generator: SelectorGenerator,
         selector_executor: SelectorExecutor,
         llm_extractor: LLMExtractor,
+        validator: ResultValidator,
+        max_retries: int = 2,
     ):
         self._fetch_service = fetch_service
         self._dom_service = dom_service
@@ -50,6 +59,8 @@ class ScraperAgent:
         self._selector_generator = selector_generator
         self._selector_executor = selector_executor
         self._llm_extractor = llm_extractor
+        self._validator = validator
+        self._max_retries = max_retries
         self._graph = self._build_graph()
 
     def _build_graph(self):
@@ -61,6 +72,9 @@ class ScraperAgent:
         workflow.add_node("gen_selectors", make_gen_selectors_node(self._selector_generator))
         workflow.add_node("execute_selectors", make_execute_selectors_node(self._selector_executor))
         workflow.add_node("llm_extract", make_llm_extract_node(self._llm_extractor))
+        workflow.add_node(
+            "validate_result", make_validate_result_node(self._validator, self._max_retries)
+        )
         workflow.add_node("finalize", self._finalize)
         workflow.add_node("handle_error", self._handle_error)
 
@@ -83,9 +97,16 @@ class ScraperAgent:
             self._route,
             {"continue": "execute_selectors", "error": "handle_error"},
         )
-        workflow.add_edge("execute_selectors", "finalize")
+        workflow.add_edge("execute_selectors", "validate_result")
         workflow.add_conditional_edges(
-            "llm_extract", self._route, {"continue": "finalize", "error": "handle_error"}
+            "llm_extract",
+            self._route,
+            {"continue": "validate_result", "error": "handle_error"},
+        )
+        workflow.add_conditional_edges(
+            "validate_result",
+            self._route_validation,
+            {"selector": "gen_selectors", "llm": "llm_extract", "done": "finalize"},
         )
         workflow.add_edge("finalize", END)
         workflow.add_edge("handle_error", END)
@@ -111,6 +132,13 @@ class ScraperAgent:
         return "selector" if plan.get("suggested_strategy") == "selector" else "llm"
 
     @staticmethod
+    def _route_validation(state: ScrapeState) -> Literal["selector", "llm", "done"]:
+        next_strategy = state.get("next_strategy")
+        if next_strategy in ("selector", "llm"):
+            return next_strategy
+        return "done"
+
+    @staticmethod
     def _finalize(state: ScrapeState) -> ScrapeState:
         return {
             "status": ScrapeStatus.COMPLETED,
@@ -121,15 +149,31 @@ class ScraperAgent:
     def _handle_error(state: ScrapeState) -> ScrapeState:
         return {"finished_at": datetime.now(UTC).isoformat()}
 
-    async def run(
-        self, url: str, prompt: str | None = None, options: dict[str, Any] | None = None
+    @staticmethod
+    def _initial_state(
+        url: str, prompt: str | None, options: dict[str, Any] | None
     ) -> ScrapeState:
-        initial: ScrapeState = {
+        return {
             "url": url,
             "prompt": prompt,
             "options": options or {},
             "status": ScrapeStatus.FETCHING,
+            "retry_count": 0,
+            "attempted_strategies": [],
             "execution_log": [],
             "started_at": datetime.now(UTC).isoformat(),
         }
-        return await self._graph.ainvoke(initial)
+
+    async def run(
+        self, url: str, prompt: str | None = None, options: dict[str, Any] | None = None
+    ) -> ScrapeState:
+        return await self._graph.ainvoke(self._initial_state(url, prompt, options))
+
+    async def astream_run(
+        self, url: str, prompt: str | None = None, options: dict[str, Any] | None = None
+    ) -> AsyncIterator[ScrapeState]:
+        """Yield the full state after each super-step, for node-level SSE progress."""
+        async for state in self._graph.astream(
+            self._initial_state(url, prompt, options), stream_mode="values"
+        ):
+            yield state

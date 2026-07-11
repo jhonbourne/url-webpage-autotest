@@ -13,6 +13,7 @@ from app.services.dom_service import DOMService
 from app.services.extraction import (
     ExtractionPlanner,
     LLMExtractor,
+    ResultValidator,
     SelectorExecutor,
     SelectorGenerator,
 )
@@ -36,6 +37,8 @@ async def lifespan(app: FastAPI):
         selector_generator=SelectorGenerator(llm),
         selector_executor=SelectorExecutor(),
         llm_extractor=LLMExtractor(llm),
+        validator=ResultValidator(min_field_coverage=settings.min_field_coverage),
+        max_retries=settings.max_extraction_retries,
     )
 
     yield

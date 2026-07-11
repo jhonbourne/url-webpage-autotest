@@ -47,9 +47,11 @@ class ScrapeResponse(BaseModel):
     status: ScrapeStatus
     url: str
     fetch_method: str | None = None
-    # P0: DOM structure summary; P1 replaces this with extracted records
+    # Extracted records + quality metrics, or the DOM summary in structure-only mode
     data: dict[str, Any] | None = None
     error: dict[str, str] | None = None
+    # Quality report from the reflection loop (row count, coverage, any issues)
+    validation: dict[str, Any] | None = None
     execution_log: list[ExecutionLogEntry] = Field(default_factory=list)
     started_at: str | None = None
     finished_at: str | None = None

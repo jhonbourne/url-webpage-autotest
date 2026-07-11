@@ -23,14 +23,19 @@ class LLMExtractor:
         self._llm = llm
 
     async def extract(
-        self, plan: ExtractionPlan, structured_dom: dict[str, Any]
+        self,
+        plan: ExtractionPlan,
+        structured_dom: dict[str, Any],
+        feedback: str | None = None,
     ) -> list[dict[str, Any]]:
         fields_desc = "\n".join(f"- {f.name}: {f.description} ({f.type})" for f in plan.fields)
         dom_json = json.dumps(structured_dom, ensure_ascii=False)
         expectation = "many records" if plan.is_list else "exactly one record"
+        feedback_block = f"A previous attempt had problems: {feedback}\n\n" if feedback else ""
         user = (
             f"Target fields:\n{fields_desc}\n\n"
             f"Expect {expectation}.\n\n"
+            f"{feedback_block}"
             f"Compressed DOM (truncated JSON):\n{dom_json[:12000]}"
         )
         try:

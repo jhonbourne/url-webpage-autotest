@@ -17,7 +17,14 @@ class ScrapeState(TypedDict, total=False):
     extraction_plan: dict[str, Any] | None
     selector_plan: dict[str, Any] | None  # only set on the "selector" strategy path
     extraction_result: dict[str, Any] | None
-    # P2: validation_report, retry_count
+
+    # --- reflection loop ---
+    validation_report: dict[str, Any] | None
+    retry_count: int
+    # strategies already tried; operator.add so each strategy node appends one
+    attempted_strategies: Annotated[list[str], operator.add]
+    next_strategy: str | None  # routing decision out of validate_result
+    last_failure_feedback: str | None
 
     # --- control ---
     status: ScrapeStatus

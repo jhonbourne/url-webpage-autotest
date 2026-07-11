@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # into the process environment, so the SDK cannot pick it up on its own).
     anthropic_api_key: str | None = None
 
+    # Extraction quality / reflection loop
+    max_extraction_retries: int = 2
+    min_field_coverage: float = 0.5
+
     # Fetching
     fetch_timeout_ms: int = 30000
     block_private_addresses: bool = True

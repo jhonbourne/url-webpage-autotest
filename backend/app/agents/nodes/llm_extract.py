@@ -20,7 +20,9 @@ def make_llm_extract_node(
         structured_dom = state["structured_dom"]
 
         try:
-            records = await extractor.extract(plan, structured_dom)
+            records = await extractor.extract(
+                plan, structured_dom, feedback=state.get("last_failure_feedback")
+            )
         except ExtractionError as e:
             return error_update("llm_extract", e.error_code, e.message)
 
@@ -28,6 +30,7 @@ def make_llm_extract_node(
 
         return {
             "extraction_result": result,
+            "attempted_strategies": ["llm"],
             "status": ScrapeStatus.VALIDATING,
             "execution_log": [
                 log_entry(
