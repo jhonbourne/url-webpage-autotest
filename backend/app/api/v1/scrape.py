@@ -1,4 +1,6 @@
 import json
+import logging
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -8,10 +10,11 @@ from app.agents.scraper_agent import ScraperAgent
 from app.agents.state import ScrapeState
 from app.models.schemas import ScrapeRequest, ScrapeResponse, ScrapeStatus
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["scrape"])
 
 
-def _build_response(final_state: ScrapeState) -> ScrapeResponse:
+def _build_response(final_state: ScrapeState, task_id: str | None = None) -> ScrapeResponse:
     status = final_state.get("status", ScrapeStatus.FAILED)
     error = None
     if status == ScrapeStatus.FAILED:
@@ -27,6 +30,7 @@ def _build_response(final_state: ScrapeState) -> ScrapeResponse:
         data = {"structured_dom": final_state["structured_dom"]}
 
     return ScrapeResponse(
+        task_id=task_id,
         status=status,
         url=final_state["url"],
         fetch_method=final_state.get("fetch_method"),
@@ -39,6 +43,21 @@ def _build_response(final_state: ScrapeState) -> ScrapeResponse:
     )
 
 
+async def _persist(request: Request, final_state: ScrapeState) -> str:
+    """Save the finished run to the local store and (optionally) the external sink."""
+    task_id = uuid.uuid4().hex
+    await request.app.state.task_repo.save_from_state(task_id, final_state)
+
+    result = final_state.get("extraction_result") or {}
+    records = result.get("records")
+    if records:
+        try:
+            await request.app.state.result_sink.write(task_id, final_state["url"], records)
+        except Exception:  # noqa: BLE001 - external sink is best-effort; local store is authoritative
+            logger.exception("external result sink failed for task %s", task_id)
+    return task_id
+
+
 @router.post("/scrape", response_model=ScrapeResponse)
 async def scrape(request: Request, payload: ScrapeRequest) -> ScrapeResponse:
     agent: ScraperAgent = request.app.state.agent
@@ -47,7 +66,8 @@ async def scrape(request: Request, payload: ScrapeRequest) -> ScrapeResponse:
         prompt=payload.prompt,
         options=payload.options.model_dump(exclude_none=True),
     )
-    return _build_response(final_state)
+    task_id = await _persist(request, final_state)
+    return _build_response(final_state, task_id)
 
 
 def _sse(event: str, data: Any) -> str:
@@ -79,6 +99,7 @@ async def scrape_stream(request: Request, payload: ScrapeRequest) -> StreamingRe
             return
 
         if final_state is not None:
-            yield _sse("completed", _build_response(final_state).model_dump(mode="json"))
+            task_id = await _persist(request, final_state)
+            yield _sse("completed", _build_response(final_state, task_id).model_dump(mode="json"))
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

@@ -1,5 +1,6 @@
 """API request/response models. Agent-internal state lives in app.agents.state."""
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -44,6 +45,7 @@ class ExecutionLogEntry(BaseModel):
 
 
 class ScrapeResponse(BaseModel):
+    task_id: str | None = None
     status: ScrapeStatus
     url: str
     fetch_method: str | None = None
@@ -55,3 +57,32 @@ class ScrapeResponse(BaseModel):
     execution_log: list[ExecutionLogEntry] = Field(default_factory=list)
     started_at: str | None = None
     finished_at: str | None = None
+
+
+class TaskSummary(BaseModel):
+    id: str
+    url: str
+    prompt: str | None
+    status: ScrapeStatus
+    strategy: str | None
+    row_count: int | None
+    error_code: str | None
+    created_at: datetime
+    finished_at: datetime | None
+
+
+class TaskListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[TaskSummary]
+
+
+class TaskDetail(TaskSummary):
+    fetch_method: str | None
+    error_message: str | None
+    execution_log: list[ExecutionLogEntry] = Field(default_factory=list)
+    fields: list[str] = Field(default_factory=list)
+    records: list[dict[str, Any]] = Field(default_factory=list)
+    field_coverage: dict[str, float] = Field(default_factory=dict)
+    validation: dict[str, Any] | None = None

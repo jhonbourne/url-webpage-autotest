@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     max_extraction_retries: int = 2
     min_field_coverage: float = 0.5
 
+    # Persistence (application state: tasks, logs, result snapshots)
+    database_url: str = "sqlite+aiosqlite:///./scraper.db"
+    # Optional external sink for RESULT data only (e.g. the team's analysis DB).
+    # Leave empty to keep results in the local database only.
+    result_sink_url: str = ""
+
     # Fetching
     fetch_timeout_ms: int = 30000
     block_private_addresses: bool = True

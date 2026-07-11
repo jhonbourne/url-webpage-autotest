@@ -7,8 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.agents.scraper_agent import ScraperAgent
 from app.api.v1 import router as v1_router
 from app.core.config import get_settings
+from app.core.db import create_engine, create_session_factory, init_db
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import request_id_var, setup_logging
+from app.repository import TaskRepository
 from app.services.dom_service import DOMService
 from app.services.extraction import (
     ExtractionPlanner,
@@ -19,6 +21,7 @@ from app.services.extraction import (
 )
 from app.services.fetch_service import FetchService
 from app.services.llm import build_chat_model
+from app.services.sinks import build_sink
 
 
 @asynccontextmanager
@@ -28,6 +31,13 @@ async def lifespan(app: FastAPI):
 
     fetch_service = FetchService(settings)
     app.state.fetch_service = fetch_service
+
+    # Persistence: local application-state store + optional external result sink.
+    engine = create_engine(settings.database_url)
+    await init_db(engine)
+    app.state.db_engine = engine
+    app.state.task_repo = TaskRepository(create_session_factory(engine))
+    app.state.result_sink = build_sink(settings)
 
     # Role-based models: general reasoning vs. code-specialized (selector generation).
     general_llm = build_chat_model(settings, role="general")
@@ -46,6 +56,8 @@ async def lifespan(app: FastAPI):
     yield
 
     await fetch_service.aclose()
+    await app.state.result_sink.aclose()
+    await engine.dispose()
 
 
 def create_app() -> FastAPI:
