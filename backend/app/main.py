@@ -1,3 +1,4 @@
+import logging
 import uuid
 from contextlib import asynccontextmanager
 
@@ -10,7 +11,7 @@ from app.core.config import get_settings
 from app.core.db import create_engine, create_session_factory, init_db
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import request_id_var, setup_logging
-from app.repository import TaskRepository
+from app.repository import SelectorCacheRepository, TaskRepository
 from app.services.dom_service import DOMService
 from app.services.extraction import (
     ExtractionPlanner,
@@ -36,7 +37,15 @@ async def lifespan(app: FastAPI):
     engine = create_engine(settings.database_url)
     await init_db(engine)
     app.state.db_engine = engine
-    app.state.task_repo = TaskRepository(create_session_factory(engine))
+    session_factory = create_session_factory(engine)
+    app.state.task_repo = TaskRepository(session_factory)
+    app.state.selector_cache = SelectorCacheRepository(session_factory)
+    # Reconcile any runs left mid-flight by a previous process (crash/restart).
+    swept = await app.state.task_repo.mark_stale_interrupted()
+    if swept:
+        logging.getLogger(__name__).warning(
+            "marked %d stale running task(s) as interrupted on startup", swept
+        )
     app.state.result_sink = build_sink(settings)
 
     # Role-based models: general reasoning vs. code-specialized (selector generation).
@@ -46,11 +55,13 @@ async def lifespan(app: FastAPI):
         fetch_service=fetch_service,
         dom_service=DOMService(),
         planner=ExtractionPlanner(general_llm),
-        selector_generator=SelectorGenerator(code_llm),
+        selector_generator=SelectorGenerator(code_llm, char_budget=settings.dom_prompt_char_budget),
         selector_executor=SelectorExecutor(),
-        llm_extractor=LLMExtractor(general_llm),
+        llm_extractor=LLMExtractor(general_llm, char_budget=settings.dom_prompt_char_budget),
         validator=ResultValidator(min_field_coverage=settings.min_field_coverage),
         max_retries=settings.max_extraction_retries,
+        dom_char_budget=settings.dom_prompt_char_budget,
+        selector_cache=app.state.selector_cache,
     )
 
     yield

@@ -28,8 +28,9 @@ Return ONLY the JSON object, no prose."""
 
 
 class SelectorGenerator:
-    def __init__(self, llm: BaseChatModel):
+    def __init__(self, llm: BaseChatModel, char_budget: int = 12000):
         self._llm = llm
+        self._char_budget = char_budget
 
     async def generate(
         self,
@@ -39,13 +40,15 @@ class SelectorGenerator:
     ) -> SelectorPlan:
         model = self._llm.with_structured_output(SelectorPlan, method="function_calling")
         fields_desc = "\n".join(f"- {f.name}: {f.description} ({f.type})" for f in plan.fields)
+        # Truncation is detected and surfaced once in the structure_dom node; here we
+        # just slice to the same budget for the prompt.
         dom_json = json.dumps(structured_dom, ensure_ascii=False)
         feedback_block = f"\nA previous attempt had problems: {feedback}\n" if feedback else ""
         user = (
             f"is_list: {plan.is_list}\n"
             f"Target fields:\n{fields_desc}\n"
             f"{feedback_block}\n"
-            f"Compressed DOM (truncated JSON):\n{dom_json[:12000]}"
+            f"Compressed DOM (truncated JSON):\n{dom_json[: self._char_budget]}"
         )
         try:
             result = await model.ainvoke(

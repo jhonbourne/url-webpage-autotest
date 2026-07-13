@@ -40,6 +40,8 @@ class FetchService:
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._browser_lock = asyncio.Lock()
+        # Bound concurrent renders: pages are memory-heavy and share one Chromium.
+        self._render_slots = asyncio.Semaphore(max(1, settings.max_concurrent_browsers))
 
     # ---------- public API ----------
 
@@ -106,6 +108,12 @@ class FetchService:
         return FetchResult(html=html, final_url=final_url, method="static")
 
     async def _fetch_browser(
+        self, url: str, wait_for_selector: str | None, timeout_ms: int
+    ) -> FetchResult:
+        async with self._render_slots:
+            return await self._render(url, wait_for_selector, timeout_ms)
+
+    async def _render(
         self, url: str, wait_for_selector: str | None, timeout_ms: int
     ) -> FetchResult:
         browser = await self._get_browser()

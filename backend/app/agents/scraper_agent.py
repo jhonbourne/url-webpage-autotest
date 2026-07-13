@@ -17,6 +17,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+from langchain_core.callbacks import UsageMetadataCallbackHandler
 from langgraph.graph import END, StateGraph
 
 from app.agents.nodes import (
@@ -38,7 +39,9 @@ from app.services.extraction import (
     SelectorExecutor,
     SelectorGenerator,
 )
+from app.services.extraction.cache import SelectorCache
 from app.services.fetch_service import FetchService
+from app.services.llm import summarize_usage
 
 
 class ScraperAgent:
@@ -52,6 +55,8 @@ class ScraperAgent:
         llm_extractor: LLMExtractor,
         validator: ResultValidator,
         max_retries: int = 2,
+        dom_char_budget: int = 12000,
+        selector_cache: SelectorCache | None = None,
     ):
         self._fetch_service = fetch_service
         self._dom_service = dom_service
@@ -61,19 +66,28 @@ class ScraperAgent:
         self._llm_extractor = llm_extractor
         self._validator = validator
         self._max_retries = max_retries
+        self._dom_char_budget = dom_char_budget
+        self._selector_cache = selector_cache
         self._graph = self._build_graph()
 
     def _build_graph(self):
         workflow = StateGraph(ScrapeState)
 
         workflow.add_node("fetch_page", make_fetch_page_node(self._fetch_service))
-        workflow.add_node("structure_dom", make_structure_dom_node(self._dom_service))
+        workflow.add_node(
+            "structure_dom",
+            make_structure_dom_node(self._dom_service, self._dom_char_budget),
+        )
         workflow.add_node("plan_extraction", make_plan_extraction_node(self._planner))
-        workflow.add_node("gen_selectors", make_gen_selectors_node(self._selector_generator))
+        workflow.add_node(
+            "gen_selectors",
+            make_gen_selectors_node(self._selector_generator, self._selector_cache),
+        )
         workflow.add_node("execute_selectors", make_execute_selectors_node(self._selector_executor))
         workflow.add_node("llm_extract", make_llm_extract_node(self._llm_extractor))
         workflow.add_node(
-            "validate_result", make_validate_result_node(self._validator, self._max_retries)
+            "validate_result",
+            make_validate_result_node(self._validator, self._max_retries, self._selector_cache),
         )
         workflow.add_node("finalize", self._finalize)
         workflow.add_node("handle_error", self._handle_error)
@@ -169,13 +183,24 @@ class ScraperAgent:
     async def run(
         self, url: str, prompt: str | None = None, options: dict[str, Any] | None = None
     ) -> ScrapeState:
-        return await self._graph.ainvoke(self._initial_state(url, prompt, options))
+        # One handler per run; LangGraph propagates it to every nested LLM call.
+        usage = UsageMetadataCallbackHandler()
+        final_state = await self._graph.ainvoke(
+            self._initial_state(url, prompt, options), config={"callbacks": [usage]}
+        )
+        final_state["token_usage"] = summarize_usage(usage.usage_metadata)
+        return final_state
 
     async def astream_run(
         self, url: str, prompt: str | None = None, options: dict[str, Any] | None = None
     ) -> AsyncIterator[ScrapeState]:
         """Yield the full state after each super-step, for node-level SSE progress."""
+        usage = UsageMetadataCallbackHandler()
         async for state in self._graph.astream(
-            self._initial_state(url, prompt, options), stream_mode="values"
+            self._initial_state(url, prompt, options),
+            stream_mode="values",
+            config={"callbacks": [usage]},
         ):
+            # Running total so far; complete once the stream ends.
+            state["token_usage"] = summarize_usage(usage.usage_metadata)
             yield state

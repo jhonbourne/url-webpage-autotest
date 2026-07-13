@@ -38,6 +38,19 @@ class FakeContentLLM:
         return _FakeMessage(self._content)
 
 
+class FakeSequenceLLM:
+    """Returns a different reply per call, to exercise the repair retry."""
+
+    def __init__(self, *contents: str):
+        self._contents = list(contents)
+        self.calls = 0
+
+    async def ainvoke(self, _messages):
+        content = self._contents[min(self.calls, len(self._contents) - 1)]
+        self.calls += 1
+        return _FakeMessage(content)
+
+
 @pytest.mark.asyncio
 async def test_planner_returns_typed_plan():
     plan = ExtractionPlan(
@@ -68,3 +81,23 @@ async def test_llm_extractor_wraps_single_object():
     llm = FakeContentLLM('{"title": "solo"}')
     records = await LLMExtractor(llm).extract(plan, {"tag": "body"})
     assert records == [{"title": "solo"}]
+
+
+@pytest.mark.asyncio
+async def test_llm_extractor_repairs_unparseable_reply():
+    plan = ExtractionPlan(is_extractable=True, fields=[FieldSpec(name="title", description="t")])
+    llm = FakeSequenceLLM("sorry, here you go: not json", '[{"title": "A"}]')
+    records = await LLMExtractor(llm).extract(plan, {"tag": "body"})
+    assert records == [{"title": "A"}]
+    assert llm.calls == 2  # first reply failed, repaired on retry
+
+
+@pytest.mark.asyncio
+async def test_llm_extractor_gives_up_after_repair():
+    from app.core.exceptions import ExtractionError
+
+    plan = ExtractionPlan(is_extractable=True, fields=[FieldSpec(name="title", description="t")])
+    llm = FakeSequenceLLM("nope", "still nope")
+    with pytest.raises(ExtractionError):
+        await LLMExtractor(llm).extract(plan, {"tag": "body"})
+    assert llm.calls == 2  # capped at max_attempts

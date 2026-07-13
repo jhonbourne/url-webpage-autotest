@@ -39,7 +39,10 @@ def build_chat_model(
             # auth error surfaced as PLANNING_FAILED / EXTRACTION_FAILED.
             "api_key": settings.dashscope_api_key or "not-set",
             "max_tokens": 4096,
-            "timeout": 60,
+            "timeout": settings.llm_timeout_s,
+            # Exponential-backoff retry on transient errors (429/5xx/timeouts),
+            # handled by the underlying OpenAI client.
+            "max_retries": settings.llm_max_retries,
             "temperature": 0,
             # Qwen3 general models enable "thinking" by default, which DashScope
             # rejects on non-streaming calls; our extraction calls are non-streaming
@@ -55,7 +58,8 @@ def build_chat_model(
         params = {
             "model": model_name,
             "max_tokens": 4096,
-            "timeout": 60,
+            "timeout": settings.llm_timeout_s,
+            "max_retries": settings.llm_max_retries,
             "temperature": 0,
         }
         if settings.anthropic_api_key:

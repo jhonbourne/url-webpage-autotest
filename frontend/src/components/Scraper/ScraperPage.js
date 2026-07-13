@@ -13,6 +13,8 @@ const { Title, Text, Paragraph } = Typography;
 const STATUS_COLORS = {
   completed: 'success',
   failed: 'error',
+  interrupted: 'warning',
+  pending: 'default',
   fetching: 'processing',
   parsing: 'processing',
   planning: 'processing',
@@ -86,6 +88,12 @@ export default function ScraperPage() {
           field_coverage: detail.field_coverage,
         },
         validation: detail.validation,
+        plan: detail.plan,
+        token_usage: {
+          total_tokens: detail.total_tokens,
+          input_tokens: detail.input_tokens,
+          output_tokens: detail.output_tokens,
+        },
         error: detail.error_code
           ? { code: detail.error_code, message: detail.error_message }
           : null,
@@ -110,6 +118,8 @@ export default function ScraperPage() {
     { title: 'Rows', dataIndex: 'row_count', key: 'row_count', width: 70 },
     { title: 'Strategy', dataIndex: 'strategy', key: 'strategy', width: 100,
       render: (s) => (s ? <Tag>{s}</Tag> : null) },
+    { title: 'Tokens', dataIndex: 'total_tokens', key: 'total_tokens', width: 90,
+      render: (n) => (n != null ? n.toLocaleString() : <Text type="secondary">—</Text>) },
   ];
 
   return (
@@ -177,6 +187,29 @@ export default function ScraperPage() {
             />
           )}
 
+          {error && result?.plan?.fields?.length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              message="What the agent planned before it stopped"
+              description={
+                `Fields: ${result.plan.fields.map((f) => f.name).join(', ')}` +
+                ` · strategy: ${result.plan.suggested_strategy}`
+              }
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
+          {result?.validation?.warnings?.length > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              message="Result may be incomplete"
+              description={result.validation.warnings.join(' ')}
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
           {result && !isStructureOnly && data.fields && (
             <Card
               size="small"
@@ -188,6 +221,9 @@ export default function ScraperPage() {
                     <Tag color={result.validation.ok ? 'success' : 'warning'}>
                       {result.validation.ok ? 'validated' : 'best-effort'}
                     </Tag>
+                  )}
+                  {result.token_usage?.total_tokens != null && (
+                    <Tag>{result.token_usage.total_tokens.toLocaleString()} tokens</Tag>
                   )}
                 </Space>
               }

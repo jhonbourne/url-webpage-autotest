@@ -16,6 +16,9 @@ class ScrapeStatus(StrEnum):
     VALIDATING = "validating"
     COMPLETED = "completed"
     FAILED = "failed"
+    # A run that never reached a terminal state (e.g. the server restarted mid-run);
+    # set by the startup sweep so pre-registered rows don't linger as pending.
+    INTERRUPTED = "interrupted"
 
 
 class ScrapeOptions(BaseModel):
@@ -51,9 +54,14 @@ class ScrapeResponse(BaseModel):
     fetch_method: str | None = None
     # Extracted records + quality metrics, or the DOM summary in structure-only mode
     data: dict[str, Any] | None = None
+    # The plan the agent produced, if it got that far — returned even on failure so a
+    # failed run still shows what fields were understood and where it stopped.
+    plan: dict[str, Any] | None = None
     error: dict[str, str] | None = None
     # Quality report from the reflection loop (row count, coverage, any issues)
     validation: dict[str, Any] | None = None
+    # Aggregate LLM token usage: {input_tokens, output_tokens, total_tokens, by_model}
+    token_usage: dict[str, Any] | None = None
     execution_log: list[ExecutionLogEntry] = Field(default_factory=list)
     started_at: str | None = None
     finished_at: str | None = None
@@ -66,6 +74,7 @@ class TaskSummary(BaseModel):
     status: ScrapeStatus
     strategy: str | None
     row_count: int | None
+    total_tokens: int | None = None
     error_code: str | None
     created_at: datetime
     finished_at: datetime | None
@@ -81,7 +90,12 @@ class TaskListResponse(BaseModel):
 class TaskDetail(TaskSummary):
     fetch_method: str | None
     error_message: str | None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
     execution_log: list[ExecutionLogEntry] = Field(default_factory=list)
+    # The plan acted on and the selectors applied — for diagnosing a wrong result.
+    plan: dict[str, Any] | None = None
+    selector_plan: dict[str, Any] | None = None
     fields: list[str] = Field(default_factory=list)
     records: list[dict[str, Any]] = Field(default_factory=list)
     field_coverage: dict[str, float] = Field(default_factory=dict)

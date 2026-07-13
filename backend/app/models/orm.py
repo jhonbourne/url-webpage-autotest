@@ -30,8 +30,16 @@ class ScrapeTask(Base):
     fetch_method: Mapped[str | None] = mapped_column(String(20), nullable=True)
     strategy: Mapped[str | None] = mapped_column(String(20), nullable=True)
     row_count: Mapped[int | None] = mapped_column(nullable=True)
+    # LLM token usage for the run (cost visibility).
+    input_tokens: Mapped[int | None] = mapped_column(nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(nullable=True)
+    total_tokens: Mapped[int | None] = mapped_column(nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The plan the agent acted on and, on the selector path, the selectors it applied.
+    # Persisted so a wrong result can be diagnosed after the fact.
+    plan: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    selector_plan: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     execution_log: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(default=_now, index=True)
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
@@ -39,6 +47,24 @@ class ScrapeTask(Base):
     result: Mapped["ScrapeResult | None"] = relationship(
         back_populates="task", uselist=False, cascade="all, delete-orphan"
     )
+
+
+class SelectorCacheEntry(Base):
+    """A validated selector plan, reusable across runs with the same cache key.
+
+    A standalone table (not a column change), so it is created additively on
+    existing databases without a migration."""
+
+    __tablename__ = "selector_cache"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    host: Mapped[str] = mapped_column(Text)
+    prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fields: Mapped[list[str]] = mapped_column(JSON, default=list)
+    selector_plan: Mapped[dict[str, Any]] = mapped_column(JSON)
+    hit_count: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(default=_now)
+    last_used_at: Mapped[datetime] = mapped_column(default=_now)
 
 
 class ScrapeResult(Base):

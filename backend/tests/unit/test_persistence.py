@@ -31,6 +31,7 @@ def _completed_state():
             "field_coverage": {"name": 1.0, "price": 1.0},
         },
         "validation_report": {"ok": True, "issues": [], "metrics": {}},
+        "token_usage": {"input_tokens": 800, "output_tokens": 120, "total_tokens": 920},
         "execution_log": [{"timestamp": "t", "step": "fetch_page", "message": "ok", "detail": {}}],
         "finished_at": "2026-07-12T00:00:00+00:00",
     }
@@ -47,6 +48,48 @@ async def test_save_and_get_task_with_result(repo: TaskRepository):
     assert task.row_count == 2
     assert task.result.records[0] == {"name": "A", "price": "1"}
     assert task.result.field_coverage["name"] == 1.0
+    assert task.total_tokens == 920
+    assert task.input_tokens == 800
+
+
+@pytest.mark.asyncio
+async def test_create_running_then_finalize_updates_same_row(repo: TaskRepository):
+    await repo.create_running("t1", "https://example.com/", "get names and prices")
+
+    # The pre-registered row is visible immediately as pending.
+    pending = await repo.get_task("t1")
+    assert pending is not None
+    assert pending.status == ScrapeStatus.PENDING
+    created_at = pending.created_at
+
+    # Finishing the run updates that same row in place (no duplicate).
+    await repo.save_from_state("t1", _completed_state())
+
+    _, total = await repo.list_tasks()
+    assert total == 1
+    task = await repo.get_task("t1", with_result=True)
+    assert task.status == "completed"
+    assert task.row_count == 2
+    assert task.created_at == created_at  # submission time preserved
+    assert task.result.records[0] == {"name": "A", "price": "1"}
+
+
+@pytest.mark.asyncio
+async def test_mark_stale_interrupted_sweeps_only_nonterminal(repo: TaskRepository):
+    await repo.create_running("running", "https://example.com/", "p")  # pending
+    await repo.save_from_state("done", _completed_state())  # completed (terminal)
+
+    swept = await repo.mark_stale_interrupted()
+    assert swept == 1
+
+    stale = await repo.get_task("running")
+    assert stale.status == ScrapeStatus.INTERRUPTED
+    assert stale.finished_at is not None
+    # Terminal rows are left untouched.
+    assert (await repo.get_task("done")).status == ScrapeStatus.COMPLETED
+
+    # Idempotent: a second sweep finds nothing to do.
+    assert await repo.mark_stale_interrupted() == 0
 
 
 @pytest.mark.asyncio

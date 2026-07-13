@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     # Anthropic (only used when llm_provider == "claude").
     anthropic_api_key: str | None = None
 
+    # LLM robustness. max_retries drives the client's exponential-backoff retry on
+    # transient failures (HTTP 429/5xx, connection/timeouts); the reflection loop
+    # (below) is a separate, quality-driven retry across extraction strategies.
+    llm_max_retries: int = 3
+    llm_timeout_s: int = 60
+    # Char budget for the compressed DOM embedded into a prompt. Serialising past
+    # this is truncated; the agent flags a truncated run so partial results are visible.
+    dom_prompt_char_budget: int = 12000
+
     # Extraction quality / reflection loop
     max_extraction_retries: int = 2
     min_field_coverage: float = 0.5
@@ -50,6 +59,9 @@ class Settings(BaseSettings):
 
     # Fetching
     fetch_timeout_ms: int = 30000
+    # Cap on concurrent browser renders. Playwright pages are memory-heavy and share
+    # one Chromium; this bounds resource use when several runs overlap.
+    max_concurrent_browsers: int = 2
     block_private_addresses: bool = True
     # Minimum visible text length before falling back to browser rendering
     static_fetch_min_text: int = 200
