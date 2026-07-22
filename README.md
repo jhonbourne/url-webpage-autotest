@@ -22,6 +22,11 @@ high-concurrency requirements, optimized for correctness, cost control and opera
   reused on later runs, so re-scraping the same site with the same request costs no LLM
   calls at all. Keyed by (host, normalised prompt, field set); a cached plan that later
   fails validation is invalidated, so stale selectors self-heal.
+- **Batch mode** — apply one request to a list of homogeneous URLs. The first URL is a
+  warm-up run that produces the extraction plan and fills the selector cache; every
+  later URL reuses both and does **no LLM work at all**. Measured on a 3-page batch:
+  8,407 tokens for the first page, 0 for the other two. Results export as one file
+  with a `source_url` column.
 - **Cost visibility** — per-run input/output token counts are recorded and shown in the
   run history.
 - **Live progress** — node-level execution streamed to the UI over Server-Sent Events.
@@ -147,6 +152,13 @@ nothing is hard-coded. Defaults below are what ships in `app/core/config.py`.
 | `MAX_EXTRACTION_RETRIES` | `2` | Reflection-loop retry cap across strategies |
 | `MIN_FIELD_COVERAGE` | `0.5` | Below this, a result fails validation and triggers a retry |
 
+**Batch mode**
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `BATCH_CONCURRENCY` | `3` | Members running at once after the warm-up (keep ≤ `MAX_CONCURRENT_BROWSERS` for rendered pages) |
+| `BATCH_MAX_URLS` | `50` | Rejected above this many URLs in one batch |
+
 **Persistence**
 
 | Variable | Default | Purpose |
@@ -187,7 +199,15 @@ outcome (stored on validation pass, invalidated on later failure).
 | GET | `/api/v1/tasks` | Paginated run history |
 | GET | `/api/v1/tasks/{id}` | Run detail (records, log, validation) |
 | GET | `/api/v1/tasks/{id}/export?format=csv\|xlsx` | Export a result |
+| POST | `/api/v1/batch` | Start a batch over many URLs (returns immediately, 202) |
+| GET | `/api/v1/batches` | Paginated batch history |
+| GET | `/api/v1/batches/{id}` | Batch progress, shared plan, member tasks |
+| GET | `/api/v1/batches/{id}/export?format=csv\|xlsx` | Combined export for a whole batch |
 | GET | `/healthz` | Health check |
+
+A batch runs in the background: `POST /api/v1/batch` returns a batch id right away,
+then poll `GET /api/v1/batches/{id}` for `completed` / `failed` counts. A URL that fails
+is recorded against its own task and never aborts the batch.
 
 ## Testing & quality
 

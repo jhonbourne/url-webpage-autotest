@@ -247,7 +247,13 @@ SSE 事件类型建议：`started` / `node_completed`（含节点名、耗时、
 8. ~~**容器化**~~ ✅ 已完成：backend Dockerfile（基于 `mcr.microsoft.com/playwright/python`）+ docker-compose（SQLite 挂命名卷）。前端开发期用 `npm start`，未做前端镜像。
 9. **可观测性** ★：接入 LangSmith（或 Langfuse 自托管）trace agent 执行。*部分完成*：自建的 execution_log 持久化已落地，每次运行的 token 用量也已记录并在前端展示；外部 trace 平台未接入。
 10. ~~**结果缓存**~~ ✅ **已完成，但实现形态与原计划不同**：缓存的不是"抓取结果"，而是**选择器方案**（`selector_cache` 表）。键为 (host, 归一化 prompt, 字段集)，而非原计划的 URL + schema —— 按 host 而非完整 URL 建键，使同站兄弟页面可共享方案。维护策略是**结果驱动**而非 TTL：通过校验才写入，事后失败则失效，让过期选择器自愈。这比 TTL 更贴合抓取场景（页面改版是事件驱动的，不是按时间到期的）。
-11. **批量模式**：一个 schema 应用到同构 URL 列表（数据团队高频需求：selector 策略天然可复用，只需首个页面走 LLM，后续纯执行——这是双策略设计的直接收益，值得实现并写进简历）。**注**：选择器缓存（第 10 项）已把地基打好——同站同请求的后续页面本就复用缓存方案、零 LLM 调用，批量模式剩下的主要是"接受 URL 列表 + 并发调度 + 汇总结果"这层编排。
+11. ~~**批量模式**~~ ✅ **已完成**。一个请求应用到同构 URL 列表，"首个页面走 LLM、后续纯执行"已实测兑现。
+
+    实现中发现：**光靠选择器缓存不足以做到零 LLM**——缓存只跳过 `gen_selectors`，`plan_extraction` 仍会对每个 URL 各调一次 LLM。因此批量模式增加了**批内计划复用**：首个 URL 作为 warm-up 单独跑完（产出 plan 并填充选择器缓存），其余 URL 用 `preset_plan` 注入该 plan，经 `_route_after_structure` 直接跳到抽取节点，两处 LLM 调用都被绕过。warm-up 必须串行先跑完——若所有 URL 一起并发启动，它们会全部 miss 缓存、各自付费，正好抵消设计意图。
+
+    实测（quotes.toscrape.com 三页）：首页 8407 tokens，后两页各 **0 tokens**，三页各抽出 10 条记录，合并导出 30 行含 `source_url` 溯源列。
+
+    其余设计：后续 URL 在信号量下并发（`BATCH_CONCURRENCY`）；单个 URL 失败/崩溃只记在自己的 task 上、不中断整批；批次后台执行、`POST /api/v1/batch` 立即返回、轮询进度；进程崩溃遗留的批次在启动时对账为 `interrupted`。计数器用 SQL 侧原子自增——并发成员的读-改-写会丢更新（这是测试实际抓到的竞态）。
 
 ---
 
@@ -260,7 +266,7 @@ SSE 事件类型建议：`started` / `node_completed`（含节点名、耗时、
 | **P2 Agent 能力** | choose_strategy 决策边；validate_result + 反思重试回环；SSE 逐节点推送 | 1–2 天 | 构造一个 selector 必失败的页面，验证自动降级与重试日志 |
 | **P3 持久化与前端** | SQLAlchemy 任务/结果表；历史与导出 API；前端改为数据表格 + 执行时间线 + 导出 | 1–2 天 | 全流程 UI 演示可录屏 |
 | **P4 质量与交付** | 测试补齐、CI、（可选）Docker、README 重写 + 架构图 | 1–2 天 | CI 绿灯；克隆仓库按 README 可 10 分钟内跑起 |
-| P5 选做 | ~~缓存~~（已完成，见 5.2 第 10 项）；批量模式、LangSmith 仍待做 | 弹性 | — |
+| P5 选做 | ~~缓存~~、~~批量模式~~ 均已完成（见 5.2 第 10、11 项）；仅 LangSmith 外部 trace 待做 | 弹性 | — |
 
 总计约 **6–11 天**有效投入，符合"非重点项目、控制规模"的定位。P0–P2 完成即可支撑简历叙述，P3–P4 决定演示与开源观感。
 
@@ -274,7 +280,7 @@ SSE 事件类型建议：`started` / `node_completed`（含节点名、耗时、
 
 - 基于 **LangGraph** 设计带条件路由与反思回环的网页信息抽取 Agent：自然语言意图 → 字段 schema → 双策略（选择器生成 / LLM 直抽）自主决策 → 结果质量校验驱动的自纠错重试与策略降级；
 - 将 LLM 输出**约束为声明式抓取方案**由受控执行器执行，替代"生成代码 + subprocess"路径，兼顾安全性与结果可重放；
-- **成本优化**：选择器方案缓存（键为 host + 归一化意图 + 字段集），同站同请求复用已验证方案，实现**零 LLM 调用**抓取；缓存维护为结果驱动（校验通过才写入、事后失败即失效），过期选择器自愈。配合按角色分派模型（通用推理 / code 专用）与 DOM prompt 预算控制，并记录每次运行的 token 用量；
+- **成本优化**：选择器方案缓存（键为 host + 归一化意图 + 字段集），同站同请求复用已验证方案；缓存维护为结果驱动（校验通过才写入、事后失败即失效），过期选择器自愈。**批量模式**下以首个 URL 为 warm-up 产出计划并预热缓存，其余 URL 复用计划直接进入抽取——实测三页批量仅首页消耗 8407 tokens、后续页面 **0 token**。配合按角色分派模型（通用推理 / code 专用）与 DOM prompt 预算控制，并记录每次运行的 token 用量；
 - **FastAPI + SSE** 全异步链路流式推送 Agent 节点级执行进度；LLM 接入抽象为角色化工厂，当前支持 DashScope（Qwen3）与 Anthropic，新增 provider 只需加一个分支；
 - **工程化**：pydantic-settings 全量配置外置（21 项）、request_id 贯穿的结构化日志、SSRF 防护（拒绝内网地址）、启动时对账中断任务、并发渲染上限、瞬时错误退避重试；pytest（mock LLM + HTML fixture + 内存 SQLite，61 用例）、mypy 全量通过、GitHub Actions CI、Docker 交付。
 

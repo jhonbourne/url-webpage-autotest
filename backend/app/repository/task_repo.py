@@ -36,13 +36,21 @@ class TaskRepository:
             await session.commit()
             return result.rowcount or 0
 
-    async def create_running(self, task_id: str, url: str, prompt: str | None) -> None:
+    async def create_running(
+        self, task_id: str, url: str, prompt: str | None, batch_id: str | None = None
+    ) -> None:
         """Record a just-accepted run before it starts, so a crash or a dropped
         client connection still leaves a trace (a task stuck in 'pending' is the
         signal). save_from_state later updates this same row on completion."""
         async with self._session_factory() as session:
             session.add(
-                ScrapeTask(id=task_id, url=url, prompt=prompt, status=str(ScrapeStatus.PENDING))
+                ScrapeTask(
+                    id=task_id,
+                    url=url,
+                    prompt=prompt,
+                    status=str(ScrapeStatus.PENDING),
+                    batch_id=batch_id,
+                )
             )
             await session.commit()
 

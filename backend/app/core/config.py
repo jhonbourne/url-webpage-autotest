@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     max_extraction_retries: int = 2
     min_field_coverage: float = 0.5
 
+    # Batch mode. Concurrency applies to the members that follow the warm-up run;
+    # keep it at or below max_concurrent_browsers when pages need rendering.
+    batch_concurrency: int = 3
+    batch_max_urls: int = 50
+
     # Persistence (application state: tasks, logs, result snapshots)
     database_url: str = "sqlite+aiosqlite:///./scraper.db"
     # Optional external sink for RESULT data only (e.g. the team's analysis DB).

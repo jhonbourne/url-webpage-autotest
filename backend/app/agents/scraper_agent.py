@@ -99,7 +99,14 @@ class ScraperAgent:
         workflow.add_conditional_edges(
             "structure_dom",
             self._route_after_structure,
-            {"plan": "plan_extraction", "skip": "finalize", "error": "handle_error"},
+            {
+                "plan": "plan_extraction",
+                # A caller-supplied plan (batch mode) skips planning entirely.
+                "selector": "gen_selectors",
+                "llm": "llm_extract",
+                "skip": "finalize",
+                "error": "handle_error",
+            },
         )
         workflow.add_conditional_edges(
             "plan_extraction",
@@ -132,11 +139,19 @@ class ScraperAgent:
         return "error" if state.get("status") == ScrapeStatus.FAILED else "continue"
 
     @staticmethod
-    def _route_after_structure(state: ScrapeState) -> Literal["plan", "skip", "error"]:
+    def _route_after_structure(
+        state: ScrapeState,
+    ) -> Literal["plan", "selector", "llm", "skip", "error"]:
         if state.get("status") == ScrapeStatus.FAILED:
             return "error"
         # No prompt => structure-only mode (no LLM spend), stop after structuring.
-        return "plan" if state.get("prompt") else "skip"
+        if not state.get("prompt"):
+            return "skip"
+        # Batch mode seeds the plan from the batch's warm-up run, so members go
+        # straight to extraction and never pay for planning again.
+        if state.get("extraction_plan"):
+            return ScraperAgent._route_strategy(state)
+        return "plan"
 
     @staticmethod
     def _route_strategy(state: ScrapeState) -> Literal["selector", "llm", "error"]:
@@ -167,9 +182,12 @@ class ScraperAgent:
 
     @staticmethod
     def _initial_state(
-        url: str, prompt: str | None, options: dict[str, Any] | None
+        url: str,
+        prompt: str | None,
+        options: dict[str, Any] | None,
+        preset_plan: dict[str, Any] | None = None,
     ) -> ScrapeState:
-        return {
+        state: ScrapeState = {
             "url": url,
             "prompt": prompt,
             "options": options or {},
@@ -179,14 +197,22 @@ class ScraperAgent:
             "execution_log": [],
             "started_at": datetime.now(UTC).isoformat(),
         }
+        if preset_plan:
+            state["extraction_plan"] = preset_plan
+        return state
 
     async def run(
-        self, url: str, prompt: str | None = None, options: dict[str, Any] | None = None
+        self,
+        url: str,
+        prompt: str | None = None,
+        options: dict[str, Any] | None = None,
+        preset_plan: dict[str, Any] | None = None,
     ) -> ScrapeState:
         # One handler per run; LangGraph propagates it to every nested LLM call.
         usage = UsageMetadataCallbackHandler()
         final_state = await self._graph.ainvoke(
-            self._initial_state(url, prompt, options), config={"callbacks": [usage]}
+            self._initial_state(url, prompt, options, preset_plan),
+            config={"callbacks": [usage]},
         )
         final_state["token_usage"] = summarize_usage(usage.usage_metadata)
         return final_state

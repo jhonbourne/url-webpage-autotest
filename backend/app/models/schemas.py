@@ -87,6 +87,40 @@ class TaskListResponse(BaseModel):
     items: list[TaskSummary]
 
 
+class BatchRequest(BaseModel):
+    """One extraction request applied to a list of homogeneous URLs (same site /
+    same page shape), which is what makes plan and selector reuse safe."""
+
+    urls: list[HttpUrl] = Field(min_length=1)
+    prompt: str = Field(min_length=1, max_length=4000)
+    options: ScrapeOptions = Field(default_factory=ScrapeOptions)
+
+
+class BatchSummary(BaseModel):
+    id: str
+    prompt: str | None
+    status: ScrapeStatus
+    total: int
+    completed: int
+    failed: int
+    created_at: datetime
+    finished_at: datetime | None
+
+
+class BatchListResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[BatchSummary]
+
+
+class BatchDetail(BatchSummary):
+    error_message: str | None = None
+    # The plan produced by the warm-up run and reused by every other URL.
+    shared_plan: dict[str, Any] | None = None
+    tasks: list[TaskSummary] = Field(default_factory=list)
+
+
 class TaskDetail(TaskSummary):
     fetch_method: str | None
     error_message: str | None

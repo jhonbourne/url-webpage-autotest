@@ -20,6 +20,29 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+class ScrapeBatch(Base):
+    """One batch run: a single extraction request applied to many URLs.
+
+    Counters are updated as member tasks finish, so progress is pollable while the
+    batch is still running."""
+
+    __tablename__ = "scrape_batches"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), index=True)
+    total: Mapped[int] = mapped_column(default=0)
+    completed: Mapped[int] = mapped_column(default=0)
+    failed: Mapped[int] = mapped_column(default=0)
+    # Set from the first (warm-up) URL and reused for the rest of the batch.
+    shared_plan: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=_now, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    tasks: Mapped[list["ScrapeTask"]] = relationship(back_populates="batch")
+
+
 class ScrapeTask(Base):
     __tablename__ = "scrape_tasks"
 
@@ -43,10 +66,15 @@ class ScrapeTask(Base):
     execution_log: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(default=_now, index=True)
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # Set when this task is a member of a batch run; NULL for single scrapes.
+    batch_id: Mapped[str | None] = mapped_column(
+        ForeignKey("scrape_batches.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     result: Mapped["ScrapeResult | None"] = relationship(
         back_populates="task", uselist=False, cascade="all, delete-orphan"
     )
+    batch: Mapped["ScrapeBatch | None"] = relationship(back_populates="tasks")
 
 
 class SelectorCacheEntry(Base):
