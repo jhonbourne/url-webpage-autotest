@@ -52,8 +52,8 @@ class ScrapeTask(Base):
 class SelectorCacheEntry(Base):
     """A validated selector plan, reusable across runs with the same cache key.
 
-    A standalone table (not a column change), so it is created additively on
-    existing databases without a migration."""
+    A standalone table, so create_all() adds it to existing databases. Newly mapped
+    *columns* on existing tables are handled separately by init_db()'s reconciliation."""
 
     __tablename__ = "selector_cache"
 
